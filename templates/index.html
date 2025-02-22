@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS Articles</title>
+    <script>
+        async function fetchArticles(page = 1) {
+            const response = await fetch(`/api/articles?page=${page}`);
+            const data = await response.json();
+            const articlesList = document.getElementById("articles");
+            articlesList.innerHTML = "";
+            
+            data.articles.forEach(article => {
+                const item = document.createElement("li");
+                item.innerHTML = `<a href="${article.link}" target="_blank">${article.title}</a> ` +
+                    ` | Rating: ${article.rating ?? "Not Rated"} ` +
+                    `<button onclick="rateArticle(${article.id}, 1)">👍</button> ` +
+                    `<button onclick="rateArticle(${article.id}, -1)">👎</button>`;
+                articlesList.appendChild(item);
+            });
+            
+            document.getElementById("nextPage").style.display = data.has_next ? "block" : "none";
+        }
+        
+        async function rateArticle(id, rating) {
+            await fetch("/api/rate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, rating })
+            });
+            fetchArticles();
+        }
+        
+        document.addEventListener("DOMContentLoaded", () => fetchArticles());
+    </script>
+</head>
+<body>
+    <h1>RSS Articles</h1>
+    <ul id="articles"></ul>
+    <button id="nextPage" onclick="fetchArticles(2)" style="display:none;">Next Page</button>
+</body>
+</html>

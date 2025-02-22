@@ -1,36 +1,74 @@
-import json
+from flask import Flask, request, jsonify, render_template
+from flask_sqlalchemy import SQLAlchemy
 import feedparser
-from datetime import datetime
+import json
 
-def load_feeds_from_json(file_path="feeds.json"):
-    """Load the JSON file with the RSS feeds."""
-    with open(file_path, "r", encoding="utf-8") as file:
-        data = json.load(file)
-    return data.get("feeds", [])
+app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///rss_articles.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
 
-def fetch_rss_feed(feed_url, start_date=None):
-    """Gets the RSS feed from the given URL and prints the titles, links, and dates of the articles."""
-    feed = feedparser.parse(feed_url)
+# Database Model
+class Article(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String, unique=True, nullable=False)
+    link = db.Column(db.String, nullable=False)
+    rating = db.Column(db.Integer, default=None)
 
-    if 'entries' in feed:
+# Create the database
+with app.app_context():
+    db.create_all()
+
+# Check if the article already exists
+def article_exists(title):
+    return Article.query.filter_by(title=title).first() is not None
+
+# Save articles
+def save_article(title, link):
+    article = Article(title=title, link=link)
+    db.session.add(article)
+    db.session.commit()
+
+# Fetch RSS feed and save it in the database
+def fetch_rss():
+    with open('feeds.json', 'r') as f:
+        feeds = json.load(f)['feeds']
+    
+    for rss_url in feeds:
+        feed = feedparser.parse(rss_url)
         for entry in feed.entries:
-            published_date = datetime(*entry.published_parsed[:6])
-            if start_date is None or published_date >= start_date:
-                print(f"Title: {entry.title}")
-                print(f"Link: {entry.link}")
-                print(f"Date: {published_date.strftime('%Y-%m-%d %H:%M:%S')}")
-                print("-" * 40)
-    else:
-        print("No articles found in the feed.")
+            if not article_exists(entry.title):
+                save_article(entry.title, entry.link)
 
-def main(start_date_str=None):
-    rss_urls = load_feeds_from_json()
-    start_date = datetime.strptime(start_date_str, "%Y-%m-%d") if start_date_str else None
+# API: Retrieve articles with pagination
+@app.route("/api/articles")
+def get_articles():
+    page = request.args.get("page", 1, type=int)
+    per_page = 25
+    articles = Article.query.paginate(page=page, per_page=per_page)
+    
+    return jsonify({
+        "articles": [{"id": a.id, "title": a.title, "link": a.link, "rating": a.rating} for a in articles.items],
+        "has_next": articles.has_next
+    })
 
-    for rss_url in rss_urls:
-        fetch_rss_feed(rss_url, start_date)
+# API: Rate an article
+@app.route("/api/rate", methods=["POST"])
+def rate_article():
+    data = request.json
+    article = Article.query.get(data["id"])
+    if article:
+        article.rating = data["rating"]
+        db.session.commit()
+        return jsonify({"message": "Rating saved"})
+    return jsonify({"error": "Article not found"}), 404
+
+# HTML page
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 if __name__ == "__main__":
-    import sys
-    start_date_arg = sys.argv[1] if len(sys.argv) > 1 else None
-    main(start_date_arg)
+    with app.app_context():
+        fetch_rss()  # Execute RSS fetch on startup
+    app.run(debug=True)
