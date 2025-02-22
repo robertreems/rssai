@@ -1,7 +1,12 @@
 {
     "feeds": [
       "https://www.nu.nl/rss",
-      "https://tweakers.net/feeds/mixed.xml"
+      "https://tweakers.net/feeds/mixed.xml",
+      "https://feeds.feedburner.com/scientias-wetenschap",
+      "https://scientias.nl/nieuws/astronomie-ruimtevaart/feed/",
+      "https://scientias.nl/nieuws/gezondheid-psychologie/feed/",
+      "https://scientias.nl/nieuws/natuur-klimaat/feed/",
+      "https://scientias.nl/nieuws/green-tech/feed/"
     ]
   }
   

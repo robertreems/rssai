@@ -1,43 +1,175 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RSS Articles</title>
-    <script>
-        async function fetchArticles(page = 1) {
-            const response = await fetch(`/api/articles?page=${page}`);
-            const data = await response.json();
-            const articlesList = document.getElementById("articles");
-            articlesList.innerHTML = "";
-            
-            data.articles.forEach(article => {
-                const item = document.createElement("li");
-                item.innerHTML = `<a href="${article.link}" target="_blank">${article.title}</a> ` +
-                    ` | Rating: ${article.rating ?? "Not Rated"} ` +
-                    `<button onclick="rateArticle(${article.id}, 1)">👍</button> ` +
-                    `<button onclick="rateArticle(${article.id}, -1)">👎</button>`;
-                articlesList.appendChild(item);
-            });
-            
-            document.getElementById("nextPage").style.display = data.has_next ? "block" : "none";
+    <title>RSS Aanbevolen Artikelen</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f4;
+            text-align: center;
         }
-        
-        async function rateArticle(id, rating) {
-            await fetch("/api/rate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id, rating })
-            });
-            fetchArticles();
+        h1 {
+            color: #333;
         }
-        
-        document.addEventListener("DOMContentLoaded", () => fetchArticles());
-    </script>
+        #loading {
+            font-size: 18px;
+            margin: 20px 0;
+        }
+        #articles {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .article-card {
+            background: white;
+            padding: 15px;
+            margin: 10px;
+            width: 300px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            text-align: left;
+        }
+        .article-card h2 {
+            font-size: 18px;
+            margin: 0;
+        }
+        .article-card p {
+            font-size: 14px;
+            color: #555;
+        }
+        .article-card a {
+            display: block;
+            margin-top: 10px;
+            color: #007BFF;
+            text-decoration: none;
+        }
+        .article-card a:hover {
+            text-decoration: underline;
+        }
+        .rating-buttons {
+            margin-top: 10px;
+        }
+        .rating-buttons button {
+            background-color: white;
+            border: 1px solid #ddd;
+            color: black;
+            padding: 8px 15px;
+            margin: 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 18px;
+        }
+        .rating-buttons button:hover {
+            background-color: #ddd;
+        }
+        .rated-message {
+            font-size: 14px;
+            color: green;
+            margin-top: 5px;
+            display: none;
+        }
+        #load-more {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        #load-more:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
-    <h1>RSS Articles</h1>
-    <ul id="articles"></ul>
-    <button id="nextPage" onclick="fetchArticles(2)" style="display:none;">Next Page</button>
+    <h1>Aanbevolen RSS Artikelen</h1>
+    <p id="loading">Artikelen laden...</p>
+    <div id="articles"></div>
+    <button id="load-more" style="display: none;">Meer laden</button>
+
+    <script>
+        let currentPage = 1;
+
+        function loadArticles() {
+            fetch(`/api/recommended_articles?page=${currentPage}`)
+                .then(response => response.json())
+                .then(data => {
+                    const articlesDiv = document.getElementById("articles");
+                    const loadingText = document.getElementById("loading");
+                    const loadMoreButton = document.getElementById("load-more");
+
+                    loadingText.style.display = "none"; // Verberg de laadtekst
+
+                    if (data.articles.length === 0 && currentPage === 1) {
+                        articlesDiv.innerHTML = "<p>Geen artikelen gevonden.</p>";
+                        return;
+                    }
+
+                    data.articles.forEach(article => {
+                        const articleElement = document.createElement("div");
+                        articleElement.classList.add("article-card");
+
+                        articleElement.innerHTML = `
+                            <h2>${article.title}</h2>
+                            <p>Voorspelde relevantie: <strong>${article.predicted_rating !== null ? article.predicted_rating.toFixed(2) : "Geen score"}</strong></p>
+                            <p>Jouw beoordeling: <strong id="rating-${article.id}">${article.rating !== null ? (article.rating > 0 ? "👍" : "👎") : "Nog niet beoordeeld"}</strong></p>
+                            <a href="${article.link}" target="_blank">Lees artikel</a>
+                            <div class="rating-buttons" id="buttons-${article.id}">
+                                <button onclick="rateArticle(${article.id}, 1)">👍</button>
+                                <button onclick="rateArticle(${article.id}, -1)">👎</button>
+                            </div>
+                            <p class="rated-message" id="rated-msg-${article.id}">Beoordeling opgeslagen!</p>
+                        `;
+
+                        articlesDiv.appendChild(articleElement);
+                    });
+
+                    // Toon "Meer laden"-knop als er meer pagina's zijn
+                    if (data.has_next) {
+                        loadMoreButton.style.display = "block";
+                    } else {
+                        loadMoreButton.style.display = "none"; // Verberg als er geen volgende pagina is
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching articles:", error);
+                    document.getElementById("loading").innerText = "Fout bij het laden van artikelen.";
+                });
+        }
+
+        function rateArticle(articleId, rating) {
+            fetch("/api/rate", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ id: articleId, rating: rating })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message === "Rating saved") {
+                    document.getElementById(`rating-${articleId}`).innerText = rating > 0 ? "👍" : "👎";
+                    document.getElementById(`rated-msg-${articleId}`).style.display = "block";
+                    document.getElementById(`buttons-${articleId}`).style.display = "none"; // Verberg duimpjes na rating
+                }
+            })
+            .catch(error => console.error("Fout bij opslaan van beoordeling:", error));
+        }
+
+        document.getElementById("load-more").addEventListener("click", function() {
+            currentPage++;
+            loadArticles();
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            loadArticles();
+        });
+    </script>
 </body>
 </html>
