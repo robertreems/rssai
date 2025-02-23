@@ -93,6 +93,7 @@
                         articleElement.classList.add("article-card");
                         articleElement.innerHTML = `
                             <h2>${article.title}</h2>
+                            <p>Gepubliceerd op: ${new Date(article.published_date).toLocaleDateString()}</p>
                             <a href="${article.link}" target="_blank">Lees artikel</a>
                         `;
                         articlesDiv.appendChild(articleElement);
