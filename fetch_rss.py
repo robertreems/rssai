@@ -2,11 +2,31 @@ from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 import feedparser
 import json
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.decomposition import LatentDirichletAllocation
-import numpy as np
+# import numpy as np
 from datetime import datetime
-from transformers import MarianMTModel, MarianTokenizer
+import argostranslate.package
+import argostranslate.translate
+
+from_code = "nl"
+to_code = "en"
+
+# Download and install Argos Translate package
+argostranslate.package.update_package_index()
+available_packages = argostranslate.package.get_available_packages()
+package_to_install = next(
+    filter(
+        lambda x: x.from_code == from_code and x.to_code == to_code, available_packages
+    )
+)
+argostranslate.package.install_from_path(package_to_install.download())
+
+def translate_text(text, from_code, to_code):
+    """Voer een vertaling uit met Argos Translate."""
+    try:
+        return argostranslate.translate.translate(text, from_code, to_code)
+    except Exception as e:
+        print(f"❌ Vertaalfout: {e}")
+        return text
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///rss_articles.db"
@@ -24,21 +44,6 @@ class Article(db.Model):
 
 with app.app_context():
     db.create_all()
-
-# Gebruik een kleiner vertaalmodel: Nederlands → Engels
-model_name = "Helsinki-NLP/opus-mt-nl-en"
-tokenizer = MarianTokenizer.from_pretrained(model_name)
-model = MarianMTModel.from_pretrained(model_name)
-
-def translate_title(title):
-    try:
-        encoded_text = tokenizer(title, return_tensors="pt", padding=True, truncation=True)
-        translated_tokens = model.generate(**encoded_text)
-        translated_title = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
-        return translated_title
-    except Exception as e:
-        print(f"Vertaalfout: {e}")
-        return title  # Terugvallen op originele titel
 
 def article_exists(title):
     return Article.query.filter_by(title=title).first() is not None
@@ -62,7 +67,7 @@ def fetch_rss():
         for entry in feed.entries:
             if not article_exists(entry.title):
                 published_date = entry.published if 'published' in entry else None
-                english_title = translate_title(entry.title)
+                english_title = translate_text(entry.title, from_code, to_code)
                 save_article(entry.title, entry.link, published_date, english_title)
 
 @app.route("/api/articles")
