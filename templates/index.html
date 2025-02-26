@@ -93,7 +93,7 @@
                         const articleElement = document.createElement("div");
                         articleElement.classList.add("article-card");
                         articleElement.innerHTML = `
-                            <h2>${article.title}</h2>
+                            <h2><a href="${article.link}" target="_blank">${article.title}</a></h2>
                             <p>Gepubliceerd op: ${new Date(article.published_date).toLocaleDateString()}</p>
                             <a href="${article.link}" target="_blank">Lees artikel</a>
                             <div>
