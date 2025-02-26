@@ -2,10 +2,31 @@ from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 import feedparser
 import json
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.decomposition import LatentDirichletAllocation
-import numpy as np
+# import numpy as np
 from datetime import datetime
+import argostranslate.package
+import argostranslate.translate
+
+from_code = "nl"
+to_code = "en"
+
+# Download and install Argos Translate package
+argostranslate.package.update_package_index()
+available_packages = argostranslate.package.get_available_packages()
+package_to_install = next(
+    filter(
+        lambda x: x.from_code == from_code and x.to_code == to_code, available_packages
+    )
+)
+argostranslate.package.install_from_path(package_to_install.download())
+
+def translate_text(text, from_code, to_code):
+    """Voer een vertaling uit met Argos Translate."""
+    try:
+        return argostranslate.translate.translate(text, from_code, to_code)
+    except Exception as e:
+        print(f"❌ Vertaalfout: {e}")
+        return text
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///rss_articles.db"
@@ -19,6 +40,7 @@ class Article(db.Model):
     title = db.Column(db.String, unique=True, nullable=False)
     link = db.Column(db.String, nullable=False)
     published_date = db.Column(db.DateTime, nullable=True)
+    english_title = db.Column(db.String, nullable=True)
 
 with app.app_context():
     db.create_all()
@@ -26,11 +48,11 @@ with app.app_context():
 def article_exists(title):
     return Article.query.filter_by(title=title).first() is not None
 
-def save_article(title, link, published_date):
+def save_article(title, link, published_date, english_title):
     if published_date:
         published_date = published_date.replace('GMT', '+0000')
         published_date = datetime.strptime(published_date, "%a, %d %b %Y %H:%M:%S %z")
-    article = Article(title=title, link=link, published_date=published_date)
+    article = Article(title=title, link=link, published_date=published_date, english_title=english_title)
     print(f"Saving article: {title}")
 
     db.session.add(article)
@@ -45,7 +67,8 @@ def fetch_rss():
         for entry in feed.entries:
             if not article_exists(entry.title):
                 published_date = entry.published if 'published' in entry else None
-                save_article(entry.title, entry.link, published_date)
+                english_title = translate_text(entry.title, from_code, to_code)
+                save_article(entry.title, entry.link, published_date, english_title)
 
 @app.route("/api/articles")
 def get_articles():
@@ -56,7 +79,8 @@ def get_articles():
                 "id": a.id, 
                 "title": a.title, 
                 "link": a.link, 
-                "published_date": a.published_date.strftime("%a, %d %b %Y %H:%M:%S %z") if a.published_date else None
+                "published_date": a.published_date.strftime("%a, %d %b %Y %H:%M:%S %z") if a.published_date else None,
+                "english_title": a.english_title
             }
             for a in articles
         ]
