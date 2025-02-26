@@ -75,6 +75,7 @@
     
     <script>
         let currentPage = 1;
+
         function loadArticles() {
             fetch(`/api/articles?page=${currentPage}`)
                 .then(response => response.json())
@@ -82,7 +83,7 @@
                     const articlesDiv = document.getElementById("articles");
                     const loadingText = document.getElementById("loading");
                     const loadMoreButton = document.getElementById("load-more");
-                    
+
                     loadingText.style.display = "none";
                     if (data.articles.length === 0 && currentPage === 1) {
                         articlesDiv.innerHTML = "<p>Geen artikelen gevonden.</p>";
@@ -95,6 +96,10 @@
                             <h2>${article.title}</h2>
                             <p>Gepubliceerd op: ${new Date(article.published_date).toLocaleDateString()}</p>
                             <a href="${article.link}" target="_blank">Lees artikel</a>
+                            <div>
+                                <button onclick="rateArticle(${article.id}, 1)">👍</button>
+                                <button onclick="rateArticle(${article.id}, -1)">👎</button>
+                            </div>
                         `;
                         articlesDiv.appendChild(articleElement);
                     });
@@ -109,10 +114,33 @@
                     document.getElementById("loading").innerText = "Fout bij het laden van artikelen.";
                 });
         }
+
+        function rateArticle(articleId, rating) {
+            fetch("/api/rate_article", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ article_id: articleId, rating: rating })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error("Error rating article:", data.error);
+                } else {
+                    console.log("Rating updated:", data.message);
+                }
+            })
+            .catch(error => {
+                console.error("Error rating article:", error);
+            });
+        }
+
         document.getElementById("load-more").addEventListener("click", function() {
             currentPage++;
             loadArticles();
         });
+
         document.addEventListener("DOMContentLoaded", function() {
             loadArticles();
         });
