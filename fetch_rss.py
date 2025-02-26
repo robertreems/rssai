@@ -41,6 +41,7 @@ class Article(db.Model):
     link = db.Column(db.String, nullable=False)
     published_date = db.Column(db.DateTime, nullable=True)
     english_title = db.Column(db.String, nullable=True)
+    rating = db.Column(db.Integer, default=0)  # -1 for negative, 0 for neutral, 1 for positive
 
 with app.app_context():
     db.create_all()
@@ -80,11 +81,30 @@ def get_articles():
                 "title": a.title, 
                 "link": a.link, 
                 "published_date": a.published_date.strftime("%a, %d %b %Y %H:%M:%S %z") if a.published_date else None,
-                "english_title": a.english_title
+                "english_title": a.english_title,
+                "rating": a.rating
             }
             for a in articles
         ]
     })
+
+@app.route("/api/rate_article", methods=["POST"])
+def rate_article():
+    data = request.json
+    article_id = data.get("article_id")
+    rating = data.get("rating")
+
+    article = Article.query.get(article_id)
+    if not article:
+        return jsonify({"error": "Article not found"}), 404
+
+    if rating in [-1, 0, 1]:
+        article.rating = rating
+    else:
+        return jsonify({"error": "Invalid rating"}), 400
+
+    db.session.commit()
+    return jsonify({"message": "Rating updated"}), 200
 
 @app.route("/")
 def index():
