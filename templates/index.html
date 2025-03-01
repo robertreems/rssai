@@ -50,64 +50,77 @@
         .article-card a:hover {
             text-decoration: underline;
         }
-        #load-more {
-            margin-top: 20px;
-            padding: 10px 20px;
+        .rating-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .rating-buttons button {
             font-size: 16px;
-            cursor: pointer;
-            background-color: #007BFF;
-            color: white;
+            padding: 5px 10px;
             border: none;
             border-radius: 5px;
-            display: none;
+            cursor: pointer;
         }
-        #load-more:hover {
-            background-color: #0056b3;
+        .thumbs-up {
+            background-color: #28a745;
+            color: white;
+        }
+        .thumbs-down {
+            background-color: #dc3545;
+            color: white;
+        }
+        .thumbs-up:hover {
+            background-color: #218838;
+        }
+        .thumbs-down:hover {
+            background-color: #c82333;
+        }
+        .predicted-rating {
+            font-weight: bold;
+            margin-top: 5px;
         }
     </style>
 </head>
 <body>
     <h1>RSS Artikelen</h1>
-    <p>Jouw RSS artikelen</p>
+    <p>Jouw RSS artikelen met voorspelde relevantie</p>
     <p id="loading">Artikelen laden...</p>
     <div id="articles"></div>
-    <button id="load-more">Meer laden</button>
     
     <script>
-        let currentPage = 1;
-
         function loadArticles() {
-            fetch(`/api/articles?page=${currentPage}`)
+            fetch("/api/articles")
                 .then(response => response.json())
                 .then(data => {
                     const articlesDiv = document.getElementById("articles");
                     const loadingText = document.getElementById("loading");
-                    const loadMoreButton = document.getElementById("load-more");
 
                     loadingText.style.display = "none";
-                    if (data.articles.length === 0 && currentPage === 1) {
+                    if (data.articles.length === 0) {
                         articlesDiv.innerHTML = "<p>Geen artikelen gevonden.</p>";
                         return;
                     }
+
                     data.articles.forEach(article => {
                         const articleElement = document.createElement("div");
                         articleElement.classList.add("article-card");
+
+                        let ratingText = "Neutraal 🤔";
+                        if (article.rating === 1) ratingText = "Voorspeld: Interessant ✅";
+                        if (article.rating === -1) ratingText = "Voorspeld: Niet interessant ❌";
+
                         articleElement.innerHTML = `
                             <h2><a href="${article.link}" target="_blank">${article.title}</a></h2>
-                            <p>Gepubliceerd op: ${new Date(article.published_date).toLocaleDateString()}</p>
-                            <a href="${article.link}" target="_blank">Lees artikel</a>
-                            <div>
-                                <button onclick="rateArticle(${article.id}, 1)">👍</button>
-                                <button onclick="rateArticle(${article.id}, -1)">👎</button>
+                            <p>Gepubliceerd op: ${article.published_date ? new Date(article.published_date).toLocaleDateString() : "Onbekend"}</p>
+                            <p class="predicted-rating">${ratingText}</p>
+                            <div class="rating-buttons">
+                                <button class="thumbs-up" onclick="rateArticle(${article.id}, 1)">👍</button>
+                                <button class="thumbs-down" onclick="rateArticle(${article.id}, -1)">👎</button>
                             </div>
                         `;
                         articlesDiv.appendChild(articleElement);
                     });
-                    if (data.has_next) {
-                        loadMoreButton.style.display = "block";
-                    } else {
-                        loadMoreButton.style.display = "none";
-                    }
                 })
                 .catch(error => {
                     console.error("Error fetching articles:", error);
@@ -129,6 +142,7 @@
                     console.error("Error rating article:", data.error);
                 } else {
                     console.log("Rating updated:", data.message);
+                    updateArticleUI(articleId, rating);
                 }
             })
             .catch(error => {
@@ -136,10 +150,21 @@
             });
         }
 
-        document.getElementById("load-more").addEventListener("click", function() {
-            currentPage++;
-            loadArticles();
-        });
+        function updateArticleUI(articleId, rating) {
+            const articles = document.querySelectorAll(".article-card");
+            articles.forEach(article => {
+                if (article.innerHTML.includes(`onclick="rateArticle(${articleId}, 1)"`)) {
+                    const ratingElement = article.querySelector(".predicted-rating");
+                    if (rating === 1) {
+                        ratingElement.innerText = "Beoordeeld: Interessant ✅";
+                    } else if (rating === -1) {
+                        ratingElement.innerText = "Beoordeeld: Niet interessant ❌";
+                    } else {
+                        ratingElement.innerText = "Beoordeeld: Neutraal 🤔";
+                    }
+                }
+            });
+        }
 
         document.addEventListener("DOMContentLoaded", function() {
             loadArticles();
