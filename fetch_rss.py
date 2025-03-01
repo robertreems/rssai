@@ -153,19 +153,35 @@ def background_fetch_rss():
 def start_background_tasks():
     threading.Thread(target=background_fetch_rss, daemon=True).start()
 
+# API Endpoint: Alleen ongelezen artikelen ophalen (inclusief 0 en -1 beoordeelde)
 @app.route("/api/articles")
 def get_articles():
-    articles = Article.query.order_by(Article.predicted_rating.desc().nullslast()).all()
+    articles = Article.query.filter((Article.rating.is_(None)) | (Article.rating == 0) | (Article.rating == -1)).order_by(Article.predicted_rating.desc().nullslast()).all()
     return jsonify({
         "articles": [
             {
-                "id": a.id, 
-                "title": a.title, 
-                "link": a.link, 
+                "id": a.id,
+                "title": a.title,
+                "link": a.link,
                 "published_date": a.published_date.strftime("%a, %d %b %Y %H:%M:%S %z") if a.published_date else None,
                 "english_title": a.english_title,
                 "rating": a.rating,
                 "predicted_rating": a.predicted_rating
+            }
+            for a in articles
+        ]
+    })
+
+@app.route("/api/all_articles")
+def get_all_articles():
+    articles = Article.query.order_by(Article.published_date.desc()).all()
+    return jsonify({
+        "articles": [
+            {
+                "id": a.id,
+                "title": a.title,
+                "link": a.link,
+                "published_date": a.published_date.strftime("%a, %d %b %Y %H:%M:%S %z") if a.published_date else None,
             }
             for a in articles
         ]
@@ -189,6 +205,22 @@ def rate_article():
     db.session.commit()
     update_predictions()
     return jsonify({"message": "Beoordeling opgeslagen"}), 200
+
+# API Endpoint: Only read articles (rating = 0 or 1)
+@app.route("/api/read_articles")
+def get_read_articles():
+    articles = Article.query.filter(Article.rating.in_([0, 1])).order_by(Article.published_date.desc()).all()
+    return jsonify({
+        "articles": [
+            {
+                "id": a.id,
+                "title": a.title,
+                "link": a.link,
+                "published_date": a.published_date.strftime("%a, %d %b %Y %H:%M:%S %z") if a.published_date else None
+            }
+            for a in articles
+        ]
+    })
 
 @app.route("/")
 def index():

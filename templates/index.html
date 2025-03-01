@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="nl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,91 +13,122 @@
             background-color: #f4f4f4;
             text-align: center;
         }
+
         h1 {
             color: #333;
         }
+
         #loading {
             font-size: 18px;
             margin: 20px 0;
         }
+
         #articles {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
         }
+
         .article-card {
             background: white;
-            padding: 15px;
+            padding: 10px;
             margin: 10px;
-            width: 300px;
+            width: 280px;
             border-radius: 5px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
             text-align: left;
+            position: relative;
         }
+
         .article-card h2 {
-            font-size: 18px;
+            font-size: 16px;
             margin: 0;
         }
+
         .article-card p {
-            font-size: 14px;
+            font-size: 13px;
             color: #555;
         }
+
         .article-card a {
             display: block;
-            margin-top: 10px;
+            margin-top: 5px;
             color: #007BFF;
             text-decoration: none;
         }
+
         .article-card a:hover {
             text-decoration: underline;
         }
+
         .rating-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 10px;
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
         }
+
         .rating-buttons button {
-            font-size: 16px;
-            padding: 5px 10px;
-            border: none;
+            font-size: 14px;
+            padding: 2px 5px;
+            border: 1px solid #ccc;
             border-radius: 5px;
             cursor: pointer;
+            background-color: transparent;
+            color: #666;
         }
-        .thumbs-up {
-            background-color: #28a745;
-            color: white;
+
+        .rating-buttons button:hover {
+            background-color: #f0f0f0;
         }
-        .thumbs-down {
-            background-color: #dc3545;
-            color: white;
-        }
-        .thumbs-up:hover {
-            background-color: #218838;
-        }
-        .thumbs-down:hover {
-            background-color: #c82333;
-        }
+
         .predicted-rating {
             font-weight: bold;
             margin-top: 5px;
         }
+
+        #filter-options {
+            margin-bottom: 20px;
+        }
+
+        select {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
     </style>
 </head>
+
 <body>
     <h1>RSS Artikelen</h1>
     <p>Jouw RSS artikelen met voorspelde relevantie</p>
+
+    <!-- Keuze voor ongelezen, gelezen of alle artikelen -->
+    <div id="filter-options">
+        <label for="article-filter">Toon:</label>
+        <select id="article-filter" onchange="loadArticles()">
+            <option value="/api/articles" selected>Ongelezen artikelen</option>
+            <option value="/api/read_articles">Gelezen artikelen</option>
+            <option value="/api/all_articles">Alle artikelen</option>
+        </select>
+    </div>
+
     <p id="loading">Artikelen laden...</p>
     <div id="articles"></div>
-    
+
     <script>
         function loadArticles() {
-            fetch("/api/articles")
+            const filter = document.getElementById("article-filter").value;
+            const articlesDiv = document.getElementById("articles");
+            const loadingText = document.getElementById("loading");
+
+            loadingText.style.display = "block";
+            articlesDiv.innerHTML = "";
+
+            fetch(filter)
                 .then(response => response.json())
                 .then(data => {
-                    const articlesDiv = document.getElementById("articles");
-                    const loadingText = document.getElementById("loading");
-
                     loadingText.style.display = "none";
+
                     if (data.articles.length === 0) {
                         articlesDiv.innerHTML = "<p>Geen artikelen gevonden.</p>";
                         return;
@@ -107,16 +139,20 @@
                         articleElement.classList.add("article-card");
 
                         let ratingText = "Neutraal 🤔";
-                        if (article.rating === 1) ratingText = "Voorspeld: Interessant ✅";
-                        if (article.rating === -1) ratingText = "Voorspeld: Niet interessant ❌";
+                        if (article.rating === 1) ratingText = "Beoordeeld: Interessant ✅";
+                        if (article.rating === 0) ratingText = "Beoordeeld: Neutraal 🤔";
+                        if (article.rating === -1) ratingText = "Beoordeeld: Niet interessant ❌";
 
                         articleElement.innerHTML = `
-                            <h2><a href="${article.link}" target="_blank">${article.title}</a></h2>
+                            <h2>
+                                <a href="${article.link}" target="_blank" onclick="rateArticle(${article.id}, 1)">
+                                    ${article.title}
+                                </a>
+                            </h2>
                             <p>Gepubliceerd op: ${article.published_date ? new Date(article.published_date).toLocaleDateString() : "Onbekend"}</p>
                             <p class="predicted-rating">${ratingText}</p>
                             <div class="rating-buttons">
-                                <button class="thumbs-up" onclick="rateArticle(${article.id}, 1)">👍</button>
-                                <button class="thumbs-down" onclick="rateArticle(${article.id}, -1)">👎</button>
+                                <button onclick="rateArticle(${article.id}, -1)">👎</button>
                             </div>
                         `;
                         articlesDiv.appendChild(articleElement);
@@ -124,7 +160,7 @@
                 })
                 .catch(error => {
                     console.error("Error fetching articles:", error);
-                    document.getElementById("loading").innerText = "Fout bij het laden van artikelen.";
+                    loadingText.innerText = "Fout bij het laden van artikelen.";
                 });
         }
 
@@ -136,39 +172,24 @@
                 },
                 body: JSON.stringify({ article_id: articleId, rating: rating })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.error("Error rating article:", data.error);
-                } else {
-                    console.log("Rating updated:", data.message);
-                    updateArticleUI(articleId, rating);
-                }
-            })
-            .catch(error => {
-                console.error("Error rating article:", error);
-            });
-        }
-
-        function updateArticleUI(articleId, rating) {
-            const articles = document.querySelectorAll(".article-card");
-            articles.forEach(article => {
-                if (article.innerHTML.includes(`onclick="rateArticle(${articleId}, 1)"`)) {
-                    const ratingElement = article.querySelector(".predicted-rating");
-                    if (rating === 1) {
-                        ratingElement.innerText = "Beoordeeld: Interessant ✅";
-                    } else if (rating === -1) {
-                        ratingElement.innerText = "Beoordeeld: Niet interessant ❌";
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error("Error rating article:", data.error);
                     } else {
-                        ratingElement.innerText = "Beoordeeld: Neutraal 🤔";
+                        console.log("Rating updated:", data.message);
+                        loadArticles(); // Vernieuw de lijst na beoordeling
                     }
-                }
-            });
+                })
+                .catch(error => {
+                    console.error("Error rating article:", error);
+                });
         }
 
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
             loadArticles();
         });
     </script>
 </body>
+
 </html>
