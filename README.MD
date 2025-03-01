@@ -41,8 +41,8 @@
 
 ## Configuration
 
-- The RSS feeds are configured in the [feeds.json](http://_vscodecontentref_/6) file.
-- The database is configured to use SQLite and is stored in [rss_articles.db](http://_vscodecontentref_/7).
+- The RSS feeds are configured in the `feeds.json` file.
+- The database is configured to use SQLite and is stored in `rss_articles.db`.
 
 ## License
 
