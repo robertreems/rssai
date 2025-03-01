@@ -8,6 +8,8 @@ import argostranslate.translate
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 import numpy as np
+import threading
+import time
 
 # Instellingen voor vertaling (Argos Translate)
 from_code = "nl"
@@ -51,7 +53,6 @@ with app.app_context():
 
 # Machine Learning Model
 def train_model():
-    """Train een eenvoudig ML-model op basis van eerdere ratings."""
     articles = Article.query.filter(Article.rating.isnot(None)).all()
     
     if len(articles) < 5:
@@ -61,12 +62,10 @@ def train_model():
     titles = [a.english_title for a in articles]
     ratings = [a.rating for a in articles]
     
-    # Tekstvectorisatie met TF-IDF
     vectorizer = TfidfVectorizer(stop_words='english', max_features=500)
     X = vectorizer.fit_transform(titles)
-    y = np.array(ratings)  # Labels (-1, 0, 1)
+    y = np.array(ratings)
     
-    # Train een Logistic Regression-model
     model = LogisticRegression()
     model.fit(X, y)
     
@@ -75,32 +74,28 @@ def train_model():
     return model, vectorizer
 
 def predict_rating(title, model, vectorizer):
-    """Voorspel een ranking score tussen 0 en 100."""
     if model is None or vectorizer is None:
-        return 50.0  # Neutrale score als er geen model is
+        return 50.0
 
     X_new = vectorizer.transform([title])
-    prob = model.predict_proba(X_new)[0]  # Geeft kans op aanwezige klassen
+    prob = model.predict_proba(X_new)[0]
 
-    # Controleer de beschikbare klassen
     classes = model.classes_
-    ranking_score = 50.0  # Standaard neutrale score
+    ranking_score = 50.0
 
     if len(classes) == 2:
         if set(classes) == {-1, 1}:
-            ranking_score = (prob[1] * 100) + (prob[0] * 0)  # Alleen -1 en 1
+            ranking_score = (prob[1] * 100) + (prob[0] * 0)
         elif set(classes) == {0, 1}:
-            ranking_score = (prob[1] * 100) + (prob[0] * 50)  # Alleen 0 en 1
+            ranking_score = (prob[1] * 100) + (prob[0] * 50)
         elif set(classes) == {-1, 0}:
-            ranking_score = (prob[1] * 50) + (prob[0] * 0)    # Alleen -1 en 0
+            ranking_score = (prob[1] * 50) + (prob[0] * 0)
     elif len(classes) == 3:
-        ranking_score = (prob[2] * 100) + (prob[1] * 50) + (prob[0] * 0)  # Alle 3 klassen
+        ranking_score = (prob[2] * 100) + (prob[1] * 50) + (prob[0] * 0)
 
     return round(ranking_score, 2)
 
-
 def update_predictions():
-    """Herberekent de ranking score voor alle artikelen."""
     model, vectorizer = train_model()
 
     if model is None or vectorizer is None:
@@ -116,11 +111,9 @@ def update_predictions():
     db.session.commit()
     print("✅ Alle artikelen hebben een nieuwe ranking score.")
 
-# Controleer of een artikel al bestaat
 def article_exists(title):
     return Article.query.filter_by(title=title).first() is not None
 
-# Sla een nieuw artikel op en voorzie het van een voorspelde score
 def save_article(title, link, published_date, english_title):
     if published_date:
         published_date = published_date.replace('GMT', '+0000')
@@ -135,7 +128,6 @@ def save_article(title, link, published_date, english_title):
     db.session.add(article)
     db.session.commit()
 
-# RSS Feeds inlezen
 def fetch_rss():
     with open('feeds.json', 'r') as f:
         feeds = json.load(f)['feeds']
@@ -148,7 +140,19 @@ def fetch_rss():
                 english_title = translate_text(entry.title, from_code, to_code)
                 save_article(entry.title, entry.link, published_date, english_title)
 
-# API Endpoint: Alle artikelen ophalen, gesorteerd op voorspelde rating
+    print("✅ RSS-feeds opgehaald en artikelen opgeslagen.")
+    update_predictions()
+
+def background_fetch_rss():
+    while True:
+        print("🚀 Achtergrondtaak gestart: RSS-feeds ophalen...")
+        with app.app_context():
+            fetch_rss()
+        time.sleep(600)  # Wacht 10 minuten
+
+def start_background_tasks():
+    threading.Thread(target=background_fetch_rss, daemon=True).start()
+
 @app.route("/api/articles")
 def get_articles():
     articles = Article.query.order_by(Article.predicted_rating.desc().nullslast()).all()
@@ -160,14 +164,13 @@ def get_articles():
                 "link": a.link, 
                 "published_date": a.published_date.strftime("%a, %d %b %Y %H:%M:%S %z") if a.published_date else None,
                 "english_title": a.english_title,
-                "rating": a.rating,  # Handmatige beoordeling
-                "predicted_rating": a.predicted_rating  # Ranking Score 0-100
+                "rating": a.rating,
+                "predicted_rating": a.predicted_rating
             }
             for a in articles
         ]
     })
 
-# API Endpoint: Beoordeel een artikel handmatig
 @app.route("/api/rate_article", methods=["POST"])
 def rate_article():
     data = request.json
@@ -184,17 +187,16 @@ def rate_article():
         return jsonify({"error": "Ongeldige beoordeling"}), 400
 
     db.session.commit()
-    update_predictions()  # Zorg dat nieuwe beoordelingen direct invloed hebben op de AI
+    update_predictions()
     return jsonify({"message": "Beoordeling opgeslagen"}), 200
 
-# Hoofdpagina (HTML-rendering)
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# Main: RSS Feeds ophalen, voorspellingen updaten en de server starten
 if __name__ == "__main__":
     with app.app_context():
-        fetch_rss()  # Nieuwe artikelen ophalen
-        update_predictions()  # Voorspellingen updaten bij elke start
-    app.run(debug=True)
+        update_predictions()
+    start_background_tasks()
+    app.run(debug=True, use_reloader=False)
+
