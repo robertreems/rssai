@@ -25,19 +25,14 @@
     pip install -r requirements.txt
     ```
 
-4. Set up the database:
-    ```sh
-    python fetch_rss.py
-    ```
-
 ## Usage
 
 1. Run the Flask application:
     ```sh
-    python fetch_rss.py
+    gunicorn --workers 3 --bind 0.0.0.0:8000 wsgi:app
     ```
 
-2. Open your web browser and go to `http://127.0.0.1:5000` to view the RSS articles.
+2. Open your web browser and go to `http://127.0.0.1:8000` to view the RSS articles.
 
 ## Configuration
 
