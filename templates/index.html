@@ -150,7 +150,6 @@
                                 </a>
                             </h2>
                             <p>Gepubliceerd op: ${article.published_date ? new Date(article.published_date).toLocaleDateString() : "Onbekend"}</p>
-                            <p class="predicted-rating">${ratingText}</p>
                             <div class="rating-buttons">
                                 <button onclick="rateArticle(${article.id}, -1)">👎</button>
                             </div>
