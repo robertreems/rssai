@@ -151,7 +151,7 @@ def background_fetch_rss():
         time.sleep(600)  # Wacht 10 minuten
 
 def start_background_tasks():
-    threading.Thread(target=background_fetch_rss, daemon=True).start()
+    threading.Thread(target=background_fetch_rss).start()
 
 # API Endpoint: Alleen ongelezen artikelen ophalen (inclusief 0 en -1 beoordeelde)
 @app.route("/api/articles")
