@@ -10,6 +10,10 @@ from sklearn.linear_model import LogisticRegression
 import numpy as np
 import threading
 import time
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Instellingen voor vertaling (Argos Translate)
 from_code = "nl"
@@ -145,13 +149,14 @@ def fetch_rss():
 
 def background_fetch_rss():
     while True:
-        print("🚀 Achtergrondtaak gestart: RSS-feeds ophalen...")
+        logger.info("🚀 Achtergrondtaak gestart: RSS-feeds ophalen...")
         with app.app_context():
             fetch_rss()
-        time.sleep(600)  # Wacht 10 minuten
+        time.sleep(600)
 
 def start_background_tasks():
-    threading.Thread(target=background_fetch_rss, daemon=True).start()
+    print("📢 start_background_tasks() wordt aangeroepen!", flush=True)
+    threading.Thread(target=background_fetch_rss, daemon=False).start()
 
 # API Endpoint: Alleen ongelezen artikelen ophalen (inclusief 0 en -1 beoordeelde)
 @app.route("/api/articles")

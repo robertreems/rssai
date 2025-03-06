@@ -27,9 +27,11 @@
 
 ## Usage
 
+This has been tested on Debian 12 on a Raspberry 5.
+
 1. Run the Flask application:
     ```sh
-    gunicorn --workers 3 --bind 0.0.0.0:8000 wsgi:app
+    gunicorn -w 1 --threads 2 -b 0.0.0.0:8000 --capture-output --log-level=debug wsgi:app
     ```
 
 2. Open your web browser and go to `http://127.0.0.1:8000` to view the RSS articles.
