@@ -240,6 +240,7 @@
                     data.articles.forEach(article => {
                         const articleElement = document.createElement("div");
                         articleElement.classList.add("article-card");
+                        articleElement.dataset.articleId = article.id;
 
                         let ratingText = "Neutraal 🤔";
                         if (article.rating === 1) ratingText = "Beoordeeld: Interessant ✅";
@@ -259,10 +260,50 @@
                         `;
                         articlesDiv.appendChild(articleElement);
                     });
+
+                    observeArticles();
                 })
                 .catch(error => {
                     console.error("Error fetching articles:", error);
                     loadingText.innerText = "Fout bij het laden van artikelen.";
+                });
+        }
+
+        function observeArticles() {
+            const articles = document.querySelectorAll(".article-card");
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const articleId = entry.target.dataset.articleId;
+                        incrementViewCount(articleId);
+                        observer.unobserve(entry.target);
+                    }
+                });
+            });
+
+            articles.forEach(article => {
+                observer.observe(article);
+            });
+        }
+
+        function incrementViewCount(articleId) {
+            fetch("/api/increment_view_count", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ article_id: articleId })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error("Error incrementing view count:", data.error);
+                    } else {
+                        console.log("View count incremented:", data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error incrementing view count:", error);
                 });
         }
 

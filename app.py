@@ -45,7 +45,8 @@ db = SQLAlchemy(app)
 # Database Model
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String, unique=True, nullable=False)
+    title = db.Column(db.String(100), nullable=False)
+    view_count = db.Column(db.Integer, default=0)  # Ensure this line is present
     link = db.Column(db.String, nullable=False)
     published_date = db.Column(db.DateTime, nullable=True)
     english_title = db.Column(db.String, nullable=True)
@@ -166,7 +167,11 @@ def start_background_tasks():
 # API Endpoint: Alleen ongelezen artikelen ophalen (inclusief 0 en -1 beoordeelde)
 @app.route("/api/articles")
 def get_articles():
-    articles = Article.query.filter((Article.rating.is_(None)) | (Article.rating == 0) | (Article.rating == -1)).order_by(Article.predicted_rating.desc().nullslast()).all()
+    articles = Article.query.filter(
+        ((Article.rating.is_(None)) | (Article.rating == 0) | (Article.rating == -1)) & 
+        (Article.view_count < 5)
+    ).order_by(Article.predicted_rating.desc().nullslast()).all()
+    
     return jsonify({
         "articles": [
             {
@@ -268,6 +273,19 @@ def fetch_articles():
     with app.app_context():
         fetch_rss()
     return jsonify({"message": "Artikelen succesvol opgehaald!"}), 200
+
+@app.route("/api/increment_view_count", methods=["POST"])
+def increment_view_count():
+    data = request.json
+    article_id = data.get("article_id")
+
+    article = Article.query.get(article_id)
+    if not article:
+        return jsonify({"error": "Artikel niet gevonden"}), 404
+
+    article.view_count += 1
+    db.session.commit()
+    return jsonify({"message": "View count incremented"}), 200
 
 @app.route("/")
 def index():
