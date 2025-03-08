@@ -188,7 +188,7 @@
                     <!-- RSS feeds will be loaded here -->
                 </tbody>
             </table>
-            <input type="text" id="new-feed-url" placeholder="Nieuwe RSS feed URL">
+            <input type="text" id="new-feed-url" placeholder="Nieuwe RSS feed URL" onkeypress="handleKeyPress(event)">
             <button onclick="addFeed()">Toevoegen</button>
             <button onclick="toggleConfigPanel()">Sluiten</button>
         </div>
@@ -338,6 +338,12 @@
                     }
                 })
                 .catch(error => console.error("Error deleting feed:", error));
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                addFeed();
+            }
         }
 
         document.addEventListener("DOMContentLoaded", function () {
