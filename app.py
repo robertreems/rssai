@@ -52,6 +52,11 @@ class Article(db.Model):
     rating = db.Column(db.Integer, default=None)  # Handmatige beoordeling (-1, 0, 1)
     predicted_rating = db.Column(db.Float, default=None)  # AI Voorspelling (0-100)
 
+# Database Model for RSS Feeds
+class RSSFeed(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    url = db.Column(db.String, unique=True, nullable=False)
+
 with app.app_context():
     db.create_all()
 
@@ -133,12 +138,12 @@ def save_article(title, link, published_date, english_title):
     db.session.commit()
 
 def fetch_rss():
-    with open('feeds.json', 'r') as f:
-        feeds = json.load(f)['feeds']
-    
-    for rss_url in feeds:
-        feed = feedparser.parse(rss_url)
-        for entry in feed.entries:
+    feeds = RSSFeed.query.all()
+    for feed in feeds:
+        rss_url = feed.url
+        logger.info("Fetching RSS feed: %s", feed.url)
+        feed_data = feedparser.parse(rss_url)
+        for entry in feed_data.entries:
             if not article_exists(entry.title):
                 published_date = entry.published if 'published' in entry else None
                 english_title = translate_text(entry.title, from_code, to_code)
@@ -226,6 +231,37 @@ def get_read_articles():
             for a in articles
         ]
     })
+
+@app.route("/api/rss_feeds", methods=["GET", "POST", "DELETE"])
+def manage_rss_feeds():
+    if request.method == "GET":
+        feeds = RSSFeed.query.all()
+        return jsonify({"feeds": [{"id": f.id, "url": f.url} for f in feeds]})
+
+    if request.method == "POST":
+        data = request.json
+        url = data.get("url")
+        if not url:
+            return jsonify({"error": "URL is required"}), 400
+
+        if RSSFeed.query.filter_by(url=url).first():
+            return jsonify({"error": "Feed already exists"}), 400
+
+        new_feed = RSSFeed(url=url)
+        db.session.add(new_feed)
+        db.session.commit()
+        return jsonify({"message": "Feed added"}), 201
+
+    if request.method == "DELETE":
+        data = request.json
+        feed_id = data.get("id")
+        feed = RSSFeed.query.get(feed_id)
+        if not feed:
+            return jsonify({"error": "Feed not found"}), 404
+
+        db.session.delete(feed)
+        db.session.commit()
+        return jsonify({"message": "Feed deleted"}), 200
 
 @app.route("/")
 def index():

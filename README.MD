@@ -36,6 +36,8 @@ This has been tested on Debian 12 on a Raspberry 5.
 
 2. Open your web browser and go to `http://127.0.0.1:8000` to view the RSS articles.
 
+3. Click on the gear icon in the top left corner to open the configuration panel and manage your RSS feeds.
+
 ## Configuration
 
 - The RSS feeds are configured in the `feeds.json` file.
