@@ -263,6 +263,12 @@ def manage_rss_feeds():
         db.session.commit()
         return jsonify({"message": "Feed deleted"}), 200
 
+@app.route("/api/fetch_articles", methods=["POST"])
+def fetch_articles():
+    with app.app_context():
+        fetch_rss()
+    return jsonify({"message": "Artikelen succesvol opgehaald!"}), 200
+
 @app.route("/")
 def index():
     return render_template("index.html")

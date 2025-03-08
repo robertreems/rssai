@@ -149,6 +149,27 @@
             left: 10px;
             cursor: pointer;
         }
+
+        #fetch-articles-button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        #fetch-articles-button:hover {
+            background-color: #0056b3;
+        }
+
+        #fetch-articles-button span {
+            margin-right: 5px;
+        }
     </style>
 </head>
 
@@ -191,6 +212,9 @@
             <input type="text" id="new-feed-url" placeholder="Nieuwe RSS feed URL" onkeypress="handleKeyPress(event)">
             <button onclick="addFeed()">Toevoegen</button>
             <button onclick="toggleConfigPanel()">Sluiten</button>
+            <button id="fetch-articles-button" onclick="fetchArticles()">
+                <span>🔄</span> Artikelen ophalen
+            </button>
         </div>
     </div>
 
@@ -344,6 +368,22 @@
             if (event.key === "Enter") {
                 addFeed();
             }
+        }
+
+        function fetchArticles() {
+            fetch("/api/fetch_articles", {
+                method: "POST"
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert("Artikelen succesvol opgehaald!");
+                        loadArticles();
+                    }
+                })
+                .catch(error => console.error("Error fetching articles:", error));
         }
 
         document.addEventListener("DOMContentLoaded", function () {
