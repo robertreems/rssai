@@ -41,6 +41,32 @@ This has been tested on Debian 12 on a Raspberry 5.
 - The RSS feeds are configured in the `feeds.json` file.
 - The database is configured to use SQLite and is stored in `rss_articles.db`.
 
+## NGINX Setup
+
+To set up NGINX as a reverse proxy for your Flask application, use the following configuration:
+
+```nginx
+location /rssai/ {
+    rewrite ^/rssai(/.*)$ $1 break;
+    proxy_pass http://unix:/tmp/rssai.sock;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 100M;
+
+    # Substitute API calls to dynamic paths
+    sub_filter '/api/' '/rssai/api/';
+    sub_filter_once off;
+}
+```
+
+When using NGINX and Unix socket, start the app with the following command:
+
+```sh
+gunicorn -w 1 --threads 2 -b unix:/tmp/rssai.sock --capture-output --log-level=debug wsgi:app
+```
+
 ## License
 
 This project is licensed under the MIT License.
