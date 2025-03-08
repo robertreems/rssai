@@ -272,6 +272,15 @@
             }
         }
 
+        document.addEventListener("keydown", function(event) {
+            if (event.key === "Escape") {
+                const panel = document.getElementById("config-panel");
+                if (panel.style.display === "flex") {
+                    panel.style.display = "none";
+                }
+            }
+        });
+
         function loadFeeds() {
             fetch("/api/rss_feeds")
                 .then(response => response.json())
