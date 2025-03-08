@@ -95,6 +95,81 @@
             border: 1px solid #ccc;
             border-radius: 5px;
         }
+
+        #config-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        #config-content {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            width: 80%;
+            max-width: 600px;
+            text-align: left;
+        }
+
+        #config-content h2 {
+            margin-top: 0;
+        }
+
+        #config-content table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        #config-content table, #config-content th, #config-content td {
+            border: 1px solid #ddd;
+        }
+
+        #config-content th, #config-content td {
+            padding: 8px;
+            text-align: left;
+        }
+
+        #config-content th {
+            background-color: #f2f2f2;
+        }
+
+        #config-content button {
+            margin-top: 10px;
+        }
+
+        #config-icon {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            cursor: pointer;
+        }
+
+        #fetch-articles-button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        #fetch-articles-button:hover {
+            background-color: #0056b3;
+        }
+
+        #fetch-articles-button span {
+            margin-right: 5px;
+        }
     </style>
 </head>
 
@@ -114,6 +189,34 @@
 
     <p id="loading">Artikelen laden...</p>
     <div id="articles"></div>
+
+    <div id="config-icon" onclick="toggleConfigPanel()">
+        ⚙️
+    </div>
+
+    <div id="config-panel">
+        <div id="config-content">
+            <h2>Configuratie</h2>
+            <table id="rss-feeds-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>URL</th>
+                        <th>Acties</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- RSS feeds will be loaded here -->
+                </tbody>
+            </table>
+            <input type="text" id="new-feed-url" placeholder="Nieuwe RSS feed URL" onkeypress="handleKeyPress(event)">
+            <button onclick="addFeed()">Toevoegen</button>
+            <button onclick="toggleConfigPanel()">Sluiten</button>
+            <button id="fetch-articles-button" onclick="fetchArticles()">
+                <span>🔄</span> Artikelen ophalen
+            </button>
+        </div>
+    </div>
 
     <script>
         function loadArticles() {
@@ -183,6 +286,104 @@
                 .catch(error => {
                     console.error("Error rating article:", error);
                 });
+        }
+
+        function toggleConfigPanel() {
+            const panel = document.getElementById("config-panel");
+            panel.style.display = panel.style.display === "flex" ? "none" : "flex";
+            if (panel.style.display === "flex") {
+                loadFeeds();
+            }
+        }
+
+        document.addEventListener("keydown", function(event) {
+            if (event.key === "Escape") {
+                const panel = document.getElementById("config-panel");
+                if (panel.style.display === "flex") {
+                    panel.style.display = "none";
+                }
+            }
+        });
+
+        function loadFeeds() {
+            fetch("/api/rss_feeds")
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById("rss-feeds-table").querySelector("tbody");
+                    tableBody.innerHTML = "";
+                    data.feeds.forEach(feed => {
+                        const row = document.createElement("tr");
+                        row.innerHTML = `
+                            <td>${feed.id}</td>
+                            <td>${feed.url}</td>
+                            <td><button onclick="deleteFeed(${feed.id})">Verwijderen</button></td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(error => console.error("Error loading feeds:", error));
+        }
+
+        function addFeed() {
+            const url = document.getElementById("new-feed-url").value;
+            fetch("/api/rss_feeds", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ url: url })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        loadFeeds();
+                        document.getElementById("new-feed-url").value = "";
+                    }
+                })
+                .catch(error => console.error("Error adding feed:", error));
+        }
+
+        function deleteFeed(id) {
+            fetch("/api/rss_feeds", {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ id: id })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        loadFeeds();
+                    }
+                })
+                .catch(error => console.error("Error deleting feed:", error));
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                addFeed();
+            }
+        }
+
+        function fetchArticles() {
+            fetch("/api/fetch_articles", {
+                method: "POST"
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert("Artikelen succesvol opgehaald!");
+                        loadArticles();
+                    }
+                })
+                .catch(error => console.error("Error fetching articles:", error));
         }
 
         document.addEventListener("DOMContentLoaded", function () {
