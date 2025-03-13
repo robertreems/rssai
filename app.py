@@ -45,7 +45,8 @@ db = SQLAlchemy(app)
 # Database Model
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String, unique=True, nullable=False)
+    title = db.Column(db.String(100), nullable=False)
+    view_count = db.Column(db.Integer, default=0)  # Ensure this line is present
     link = db.Column(db.String, nullable=False)
     published_date = db.Column(db.DateTime, nullable=True)
     english_title = db.Column(db.String, nullable=True)
@@ -57,8 +58,18 @@ class RSSFeed(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String, unique=True, nullable=False)
 
+# Database Model for Configuration Settings
+class Config(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    view_count = db.Column(db.Integer, default=5)
+
 with app.app_context():
     db.create_all()
+    # Ensure default configuration exists
+    if Config.query.first() is None:
+        default_config = Config(view_count=5)
+        db.session.add(default_config)
+        db.session.commit()
 
 # Machine Learning Model
 def train_model():
@@ -166,7 +177,13 @@ def start_background_tasks():
 # API Endpoint: Alleen ongelezen artikelen ophalen (inclusief 0 en -1 beoordeelde)
 @app.route("/api/articles")
 def get_articles():
-    articles = Article.query.filter((Article.rating.is_(None)) | (Article.rating == 0) | (Article.rating == -1)).order_by(Article.predicted_rating.desc().nullslast()).all()
+    config = Config.query.first()
+    view_count_limit = config.view_count
+    articles = Article.query.filter(
+        ((Article.rating.is_(None)) | (Article.rating == 0) | (Article.rating == -1)) & 
+        (Article.view_count < view_count_limit)
+    ).order_by(Article.predicted_rating.desc().nullslast()).all()
+    
     return jsonify({
         "articles": [
             {
@@ -268,6 +285,36 @@ def fetch_articles():
     with app.app_context():
         fetch_rss()
     return jsonify({"message": "Artikelen succesvol opgehaald!"}), 200
+
+@app.route("/api/increment_view_count", methods=["POST"])
+def increment_view_count():
+    data = request.json
+    article_id = data.get("article_id")
+
+    article = Article.query.get(article_id)
+    if not article:
+        return jsonify({"error": "Artikel niet gevonden"}), 404
+
+    article.view_count += 1
+    db.session.commit()
+    return jsonify({"message": "View count incremented"}), 200
+
+@app.route("/api/config", methods=["GET", "POST"])
+def manage_config():
+    if request.method == "GET":
+        config = Config.query.first()
+        return jsonify({"view_count": config.view_count})
+
+    if request.method == "POST":
+        data = request.json
+        view_count = data.get("view_count")
+        if view_count is None:
+            return jsonify({"error": "view_count is required"}), 400
+
+        config = Config.query.first()
+        config.view_count = view_count
+        db.session.commit()
+        return jsonify({"message": "Configuration updated"}), 200
 
 @app.route("/")
 def index():
