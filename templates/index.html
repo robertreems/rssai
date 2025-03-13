@@ -229,6 +229,10 @@
             <button id="fetch-articles-button" onclick="fetchArticles()">
                 <span>🔄</span> Artikelen ophalen
             </button>
+            <div>
+                <label for="view-count">Maximale weergaven per artikel:</label>
+                <input type="number" id="view-count" min="1" value="5" oninput="updateConfig()">
+            </div>
         </div>
     </div>
 
@@ -348,6 +352,9 @@
             panel.style.display = panel.style.display === "flex" ? "none" : "flex";
             if (panel.style.display === "flex") {
                 loadFeeds();
+                loadConfig();
+            } else {
+                updateConfig();
             }
         }
 
@@ -356,6 +363,7 @@
                 const panel = document.getElementById("config-panel");
                 if (panel.style.display === "flex") {
                     panel.style.display = "none";
+                    updateConfig();
                 }
             }
         });
@@ -378,6 +386,35 @@
                     });
                 })
                 .catch(error => console.error("Error loading feeds:", error));
+        }
+
+        function loadConfig() {
+            fetch("/api/config")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("view-count").value = data.view_count;
+                })
+                .catch(error => console.error("Error loading config:", error));
+        }
+
+        function updateConfig() {
+            const viewCount = document.getElementById("view-count").value;
+            fetch("/api/config", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ view_count: viewCount })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        console.log("Configuratie bijgewerkt!");
+                    }
+                })
+                .catch(error => console.error("Error updating config:", error));
         }
 
         function addFeed() {

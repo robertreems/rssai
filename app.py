@@ -58,8 +58,18 @@ class RSSFeed(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     url = db.Column(db.String, unique=True, nullable=False)
 
+# Database Model for Configuration Settings
+class Config(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    view_count = db.Column(db.Integer, default=5)
+
 with app.app_context():
     db.create_all()
+    # Ensure default configuration exists
+    if Config.query.first() is None:
+        default_config = Config(view_count=5)
+        db.session.add(default_config)
+        db.session.commit()
 
 # Machine Learning Model
 def train_model():
@@ -167,9 +177,11 @@ def start_background_tasks():
 # API Endpoint: Alleen ongelezen artikelen ophalen (inclusief 0 en -1 beoordeelde)
 @app.route("/api/articles")
 def get_articles():
+    config = Config.query.first()
+    view_count_limit = config.view_count
     articles = Article.query.filter(
         ((Article.rating.is_(None)) | (Article.rating == 0) | (Article.rating == -1)) & 
-        (Article.view_count < 5)
+        (Article.view_count < view_count_limit)
     ).order_by(Article.predicted_rating.desc().nullslast()).all()
     
     return jsonify({
@@ -286,6 +298,23 @@ def increment_view_count():
     article.view_count += 1
     db.session.commit()
     return jsonify({"message": "View count incremented"}), 200
+
+@app.route("/api/config", methods=["GET", "POST"])
+def manage_config():
+    if request.method == "GET":
+        config = Config.query.first()
+        return jsonify({"view_count": config.view_count})
+
+    if request.method == "POST":
+        data = request.json
+        view_count = data.get("view_count")
+        if view_count is None:
+            return jsonify({"error": "view_count is required"}), 400
+
+        config = Config.query.first()
+        config.view_count = view_count
+        db.session.commit()
+        return jsonify({"message": "Configuration updated"}), 200
 
 @app.route("/")
 def index():
