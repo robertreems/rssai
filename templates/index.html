@@ -374,8 +374,7 @@
                 .then(data => {
                     const tableBody = document.getElementById("rss-feeds-table").querySelector("tbody");
                     tableBody.innerHTML = "";
-                    const feedsToShow = data.feeds.slice(0, 10); // Limit to 10 feeds
-                    feedsToShow.forEach(feed => {
+                    data.feeds.forEach(feed => {
                         const row = document.createElement("tr");
                         row.innerHTML = `
                             <td>${feed.id}</td>
